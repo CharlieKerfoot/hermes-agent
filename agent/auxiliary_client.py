@@ -90,7 +90,9 @@ def _normalize_aux_provider(provider: Optional[str], *, for_vision: bool = False
         # and non-aggregator providers (DeepSeek, Alibaba, etc.) work correctly.
         main_prov = _read_main_provider()
         if main_prov and main_prov not in ("auto", "main", ""):
-            return main_prov
+            if for_vision:
+                return main_prov
+            return _normalize_aux_provider(main_prov)
         return "custom"
     return _PROVIDER_ALIASES.get(normalized, normalized)
 
@@ -825,7 +827,8 @@ def _read_main_provider() -> str:
     """Read the user's configured main provider from config.yaml.
 
     Returns the lowercase provider id (e.g. "alibaba", "openrouter") or ""
-    if not configured.
+    if not configured.  Named custom providers are returned with the
+    ``custom:`` prefix intact so callers can distinguish them.
     """
     try:
         from hermes_cli.config import load_config
@@ -834,7 +837,12 @@ def _read_main_provider() -> str:
         if isinstance(model_cfg, dict):
             provider = model_cfg.get("provider", "")
             if isinstance(provider, str) and provider.strip():
-                return _normalize_aux_provider(provider)
+                prov = provider.strip().lower()
+                if prov.startswith("custom:"):
+                    return prov
+                if prov == "codex":
+                    return "openai-codex"
+                return _PROVIDER_ALIASES.get(prov, prov)
     except Exception:
         pass
     return ""
@@ -1425,6 +1433,7 @@ def get_async_text_auxiliary_client(task: str = ""):
 _VISION_AUTO_PROVIDER_ORDER = (
     "openrouter",
     "nous",
+    "openai-codex",
 )
 
 

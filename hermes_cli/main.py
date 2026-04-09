@@ -204,10 +204,11 @@ def _has_any_provider_configured() -> bool:
     # often don't require an API key.
     from hermes_cli.auth import PROVIDER_REGISTRY
 
-    # Collect all provider env vars
+    # Collect all provider env vars (skip copilot — its GITHUB_TOKEN is
+    # ambient on many CI/dev machines and causes false positives).
     provider_env_vars = {"OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "OPENAI_BASE_URL"}
-    for pconfig in PROVIDER_REGISTRY.values():
-        if pconfig.auth_type == "api_key":
+    for pid, pconfig in PROVIDER_REGISTRY.items():
+        if pconfig.auth_type == "api_key" and pid != "copilot":
             provider_env_vars.update(pconfig.api_key_env_vars)
     if any(os.getenv(v) for v in provider_env_vars):
         return True
@@ -227,13 +228,26 @@ def _has_any_provider_configured() -> bool:
         except Exception:
             pass
 
-    # Check provider-specific auth fallbacks (for example, Copilot via gh auth).
+    # Check provider-specific auth fallbacks (skip copilot — handled below).
     try:
         for provider_id, pconfig in PROVIDER_REGISTRY.items():
             if pconfig.auth_type != "api_key":
                 continue
+            if provider_id == "copilot":
+                continue
             status = get_auth_status(provider_id)
             if status.get("logged_in"):
+                return True
+    except Exception:
+        pass
+
+    # Copilot: only detect via the gh CLI to avoid ambient GITHUB_TOKEN false positives.
+    try:
+        from hermes_cli.copilot_auth import _try_gh_cli_token, validate_copilot_token
+        token = _try_gh_cli_token()
+        if token:
+            valid, _ = validate_copilot_token(token)
+            if valid:
                 return True
     except Exception:
         pass
