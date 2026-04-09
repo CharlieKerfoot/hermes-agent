@@ -6,11 +6,17 @@ dispatch.  All external dependencies (faster_whisper, openai) are mocked.
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
+
+# Inject a stub faster_whisper module so patch("faster_whisper.WhisperModel")
+# works even when the optional dependency is not installed.
+if "faster_whisper" not in sys.modules:
+    sys.modules["faster_whisper"] = MagicMock()
 
 
 # ---------------------------------------------------------------------------

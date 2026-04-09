@@ -8,10 +8,17 @@ end-to-end dispatch.  All external dependencies are mocked.
 import os
 import struct
 import subprocess
+import sys
 import wave
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Inject a stub faster_whisper module so patch("faster_whisper.WhisperModel")
+# works even when the optional dependency is not installed.
+if "faster_whisper" not in sys.modules:
+    _fw_stub = MagicMock()
+    sys.modules["faster_whisper"] = _fw_stub
 
 
 # ============================================================================
@@ -663,18 +670,11 @@ class TestValidateAudioFileEdgeCases:
         f = tmp_path / "test.ogg"
         f.write_bytes(b"data")
         from tools.transcription_tools import _validate_audio_file
-        real_stat = f.stat()
-        call_count = 0
 
-        def stat_side_effect(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            # First calls are from exists() and is_file(), let them pass
-            if call_count <= 2:
-                return real_stat
-            raise OSError("disk error")
-
-        with patch("pathlib.Path.stat", side_effect=stat_side_effect):
+        # In Python 3.14+ exists() and is_file() use C-level os.stat
+        # rather than Path.stat(), so the first Path.stat() call is the
+        # explicit one inside _validate_audio_file for the size check.
+        with patch("pathlib.Path.stat", side_effect=OSError("disk error")):
             result = _validate_audio_file(str(f))
         assert result is not None
         assert "Failed to access" in result["error"]
