@@ -133,13 +133,15 @@ def _install_dependencies(provider_name: str) -> None:
         install_cmd = dep.get("install", "")
         if check_cmd:
             try:
-                subprocess.run(
+                result = subprocess.run(
                     check_cmd, shell=True, capture_output=True, timeout=5
                 )
+                not_installed = result.returncode != 0
             except Exception:
-                if install_cmd:
-                    print(f"\n  ⚠ '{dep_name}' not found. Install with:")
-                    print(f"    {install_cmd}")
+                not_installed = True
+            if not_installed and install_cmd:
+                print(f"\n  ⚠ '{dep_name}' not found. Install with:")
+                print(f"    {install_cmd}")
 
 
 def _get_available_providers() -> list:
