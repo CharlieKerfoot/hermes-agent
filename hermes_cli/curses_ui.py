@@ -247,7 +247,7 @@ def curses_radiolist(
                     y = draw_i + items_start
                     if y >= max_y - 1:
                         break
-                    radio = "\u25cf" if i == selected else "\u25cb"
+                    radio = "\u25cf" if i == cursor else "\u25cb"
                     arrow = "\u2192" if i == cursor else " "
                     line = f" {arrow} ({radio}) {items[i]}"
                     attr = curses.A_NORMAL
